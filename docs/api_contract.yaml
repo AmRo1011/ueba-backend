@@ -1,0 +1,264 @@
+openapi: 3.0.3
+info:
+  title: UEBA API Contract
+  version: "1.0.0"
+  description: |
+    Machine-readable contract for the UEBA backend. This is a concise subset of the
+    most-used endpoints: system, data ingestion, detection run, anomaly listing/resolution,
+    and users/top-risk. Responses are wrapped by the project's `ok()` helper which returns
+    { success, message, data, timestamp }.
+
+servers:
+  - url: /api/v1
+
+components:
+  schemas:
+    ApiWrapper:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+
+    HealthData:
+      type: object
+      properties:
+        status:
+          type: string
+        db:
+          type: string
+        version:
+          type: string
+
+    UploadLogsResponse:
+      type: object
+      properties:
+        inserted:
+          type: integer
+
+    DetectionRunResponse:
+      type: object
+      properties:
+        created:
+          type: integer
+
+    AnomalyItem:
+      type: object
+      properties:
+        id: { type: integer }
+        uid: { type: string }
+        type: { type: string }
+        score: { type: number }
+        risk: { type: number }
+        confidence: { type: number }
+        status: { type: string }
+        detected_at: { type: string, format: date-time }
+        evidence: { type: object, nullable: true }
+
+    AnomaliesListData:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnomalyItem'
+        count:
+          type: integer
+
+    ResolveResponseData:
+      type: object
+      properties:
+        id: { type: integer }
+        status: { type: string }
+
+    TopRiskUserItem:
+      type: object
+      properties:
+        id: { type: integer }
+        uid: { type: string }
+        username: { type: string, nullable: true }
+        risk_score: { type: number }
+        anomaly_count: { type: integer }
+
+    TopRiskListData:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopRiskUserItem'
+
+  parameters:
+    limitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 50
+    offsetParam:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        default: 0
+
+paths:
+  /system/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiWrapper'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/HealthData'
+
+  /system/status:
+    get:
+      summary: DB status
+      responses:
+        '200':
+          description: DB status (wrapped)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiWrapper'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/HealthData'
+
+  /data/upload-logs:
+    post:
+      summary: Upload logs (CSV or JSON array)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Inserted count
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiWrapper'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UploadLogsResponse'
+
+  /detection/run:
+    post:
+      summary: Run detection rules (admin)
+      parameters:
+        - in: query
+          name: enabled
+          schema:
+            type: array
+            items: { type: string }
+            style: form
+      responses:
+        '200':
+          description: Created anomalies count
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiWrapper'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DetectionRunResponse'
+
+  /anomalies:
+    get:
+      summary: List anomalies (admin/analyst)
+      parameters:
+        - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/offsetParam'
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [open, closed]
+      responses:
+        '200':
+          description: List of anomalies (wrapped)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiWrapper'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AnomaliesListData'
+
+  /anomalies/{anomaly_id}/resolve:
+    post:
+      summary: Resolve an anomaly (set status=closed)
+      parameters:
+        - name: anomaly_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Resolved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiWrapper'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ResolveResponseData'
+
+  /users/top-risk:
+    get:
+      summary: Top risky users (admin/analyst)
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: min_risk
+          schema:
+            type: number
+            default: 0
+      responses:
+        '200':
+          description: Top risk users wrapped
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiWrapper'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TopRiskListData'
