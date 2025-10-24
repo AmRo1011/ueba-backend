@@ -1,0 +1,7 @@
+uid,timestamp,activity_type,source_ip,username,email
+u4,2025-10-24T10:00:00Z,login_success,203.0.113.10,alice,alice@ex.com
+u4,2025-10-24T10:10:00Z,login_success,198.51.100.22,alice,alice@ex.com
+u5,2025-10-24T11:00:00Z,login_success,10.20.30.40,bob,bob@ex.com
+u5,2025-10-24T11:05:00Z,login_success,10.20.30.99,bob,bob@ex.com
+u6,2025-10-24T09:00:00Z,login_success,192.0.2.5,carol,carol@ex.com
+u6,2025-10-24T11:30:00Z,login_success,198.51.100.200,carol,carol@ex.com

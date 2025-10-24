@@ -5,6 +5,7 @@ from app.infra.db.database import get_db
 from app.core.uow import IUnitOfWork
 from app.infra.db.uow_sqlalchemy import SQLAlchemyUoW
 from app.core.security import verify_token
+from app.core.auth_supabase import get_current_user
 
 def get_uow(db: Session = Depends(get_db)) -> IUnitOfWork:
     return SQLAlchemyUoW(db)
@@ -18,10 +19,9 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
     return payload
 
-def require_role(*allowed: str) -> Callable:
-    def dep(user=Depends(get_current_user)):
-        role = (user.get("role") or "").lower()
-        if allowed and role not in [r.lower() for r in allowed]:
-            raise HTTPException(status_code=403, detail="Forbidden")
+def require_role(*roles):
+    def wrapper(user = Depends(get_current_user)):
+        if user["role"] not in roles:
+            raise HTTPException(status_code=403, detail="Not authorized")
         return user
-    return dep
+    return wrapper

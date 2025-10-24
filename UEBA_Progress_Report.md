@@ -1,4 +1,4 @@
-# UEBA Backend – Progress Report (Up to 2025-10-23)
+# UEBA Backend – Progress Report (Up to 2025-10-24)
 
 > This Markdown is ready to drop into your repo (e.g., `docs/PROGRESS.md`).  
 > It documents what we built, how it’s structured, how to run and test it, the decisions taken, and what’s next.
@@ -16,6 +16,7 @@
 - [Implemented API Endpoints](#implemented-api-endpoints)
 - [Data Ingestion Flow](#data-ingestion-flow)
 - [Detection Rules](#detection-rules)
+- [Machine Learning Detection](#machine-learning-detection)
 - [Security (JWT + CORS)](#security-jwt--cors)
 - [How to Run (Windows/PowerShell)](#how-to-run-windowspowershell)
 - [Smoke Tests (curl/PowerShell)](#smoke-tests-curlpowershell)
@@ -29,11 +30,10 @@
 
 - **Goal:** Build a lightweight, explainable UEBA backend: ingest logs → normalize/store → run behavior rules → produce anomalies & risk scores → expose data via APIs for the frontend.
 - **Stack:** FastAPI, SQLAlchemy, Alembic, PostgreSQL (Supabase), Python 3.13.
-- **Status:** End-to-end pipeline working:
-  - Upload logs (CSV/JSON) → stored in `logs` and `users`.
-  - Run detection rules → anomalies generated, user risk updated.
-  - List/resolve anomalies and view top-risk users.
-  - Basic **JWT auth** (dev token) and **CORS** in place.
+- **Status:** Core pipeline is stable and enhanced with major new features:
+  - **Impossible Travel Rule** and **ML-based detection** now operational.
+  - **Supabase Auth (RS256)** integrated for production-ready security.
+  - All original features (log ingestion, rule execution, anomaly management) remain functional.
 
 ---
 
@@ -69,6 +69,7 @@ app/
       anomalies.py
       users.py
   core/
+    auth_supabase.py
     security.py
     responses.py
     uow.py
@@ -81,9 +82,11 @@ app/
       base.py
       after_hours.py
       failed_logins.py
+      impossible_travel.py
       registry.py
     services/
       detection_service.py
+      feature_builder.py
   infra/
     db/
       database.py
@@ -94,7 +97,14 @@ app/
         user_repo.py
         log_repo.py
         anomaly_repo.py
+    models/
+      catboost_detector.py
+      model_registry.py
+    utils/
+      ipgeo.py
   main.py
+models/
+  insider_catboost.cbm
 migrations/
 alembic.ini
 .env
@@ -163,16 +173,27 @@ All unified under consistent response shape.
 
 ## Detection Rules
 
-- **After Hours:** detect activities outside working hours.
-- **Failed Logins:** detect login_failed spikes.
+- **After Hours:** Detects activities outside of standard working hours.
+- **Failed Logins:** Identifies spikes in `login_failed` events for a user.
+- **Impossible Travel:** Flags user activity from geographically distant locations in an impossibly short time frame.
+
+---
+
+## Machine Learning Detection
+
+- **CatBoost Model:** A new ML-based detection capability has been integrated to identify complex patterns indicative of insider threats.
+- **Workflow:**
+  1.  `FeatureBuilder` service transforms raw logs into numerical feature vectors.
+  2.  `CatBoostDetector` loads the pre-trained model (`insider_catboost.cbm`).
+  3.  The model predicts an anomaly score for the user's activity.
 
 ---
 
 ## Security (JWT + CORS)
 
-- Dev JWTs with `/system/dev-token`.
-- Role-based access via `require_role(...)`.
-- Configurable origins via `.env`.
+- **Supabase Auth:** Integrated for production-ready security. The system now validates RS256 JWTs issued by Supabase, replacing the previous dev-only tokens.
+- **Role-Based Access:** Continues to use `require_role(...)` for fine-grained access control.
+- **CORS:** Origins remain configurable via `.env`.
 
 ---
 
@@ -211,8 +232,10 @@ Key issues solved:
 
 ## Next Steps / Roadmap
 
-1. Add **Impossible Travel Rule**.
-2. Integrate **Supabase Auth** (RS256 JWTs).
-3. Optimize indexes and queries.
-4. Add unit tests and background tasks.
-5. Add Prometheus metrics and Celery queue.
+1. **DONE:** Add **Impossible Travel Rule**.
+2. **DONE:** Integrate **Supabase Auth** (RS256 JWTs).
+3. **NEW:** Integrate **ML Model** for advanced anomaly detection.
+4. Optimize database indexes and high-traffic queries.
+5. Implement unit and integration tests for critical services.
+6. Introduce background tasks (e.g., Celery) for non-blocking detection runs.
+7. Add Prometheus metrics for monitoring API performance and system health.
