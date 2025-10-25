@@ -27,3 +27,15 @@ app.include_router(detection_router,  prefix="/api/v1")
 app.include_router(anomalies_router,  prefix="/api/v1")
 app.include_router(users_router,      prefix="/api/v1")
 
+
+
+
+# === UEBA demo routers (users, analytics) ===
+try:
+    from app.api.routers.users import router as users_router
+    from app.api.routers.analytics import router as analytics_router
+    app.include_router(users_router)
+    app.include_router(analytics_router)
+except Exception as e:
+    # ??? ????? ???? ?? ?? ImportError
+    print("Router include error:", e)
